@@ -1,0 +1,302 @@
+ # Kubernetes manifests for studio pipeline setup
+
+---
+# Deployments file (deployments.yaml)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ayon-server
+  namespace: studio-pipeline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ayon-server
+  template:
+    metadata:
+      labels:
+        app: ayon-server
+    spec:
+      containers:
+      - name: server
+        image: ynput/ayon:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: POSTGRES_USER
+          value: "ayon"
+        - name: POSTGRES_PASSWORD
+          value: "ayonpassword"
+        - name: POSTGRES_DB
+          value: "ayon"
+        volumeMounts:
+        - name: addons-volume
+          mountPath: /addons
+        - name: storage-volume
+          mountPath: /storage
+      volumes:
+      - name: addons-volume
+        persistentVolumeClaim:
+          claimName: addons-pvc
+      - name: storage-volume
+        persistentVolumeClaim:
+          claimName: storage-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zulip-server
+  namespace: studio-pipeline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zulip-server
+  template:
+    metadata:
+      labels:
+        app: zulip-server
+    spec:
+      containers:
+      - name: zulip
+        image: zulip/docker-zulip:9.4-0
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        env:
+        - name: DB_HOST
+          value: "zulip-database"
+        - name: DB_USER
+          value: "zulip"
+        - name: DB_PASSWORD
+          value: "zulippassword"
+        - name: SECRETS_rabbitmq_password
+          value: "rabbitmqpassword"
+        - name: SECRETS_postgres_password
+          value: "zulippassword"
+        - name: SETTING_EXTERNAL_HOST
+          value: "zulip.studio.local"
+      volumes:
+      - name: zulip-data-volume
+        persistentVolumeClaim:
+          claimName: zulip-data-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: studio-pipeline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:5.0
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongodb-volume
+          mountPath: /data/db
+      volumes:
+      - name: mongodb-volume
+        persistentVolumeClaim:
+          claimName: mongodb-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab
+  namespace: studio-pipeline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab
+  template:
+    metadata:
+      labels:
+        app: gitlab
+    spec:
+      containers:
+      - name: gitlab
+        image: gitlab/gitlab-ce:latest
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        env:
+        - name: GITLAB_OMNIBUS_CONFIG
+          value: "external_url 'http://gitlab.studio.local'; gitlab_rails['initial_root_password'] = 'gitlabpassword';"
+        volumeMounts:
+        - name: gitlab-config-volume
+          mountPath: /etc/gitlab
+        - name: gitlab-logs-volume
+          mountPath: /var/log/gitlab
+        - name: gitlab-data-volume
+          mountPath: /var/opt/gitlab
+      volumes:
+      - name: gitlab-config-volume
+        persistentVolumeClaim:
+          claimName: gitlab-config-pvc
+      - name: gitlab-logs-volume
+        persistentVolumeClaim:
+          claimName: gitlab-logs-pvc
+      - name: gitlab-data-volume
+        persistentVolumeClaim:
+          claimName: gitlab-data-pvc
+---
+## pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: addons-pvc
+  namespace: studio-pipeline
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-pvc
+  namespace: studio-pipeline
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zulip-data-pvc
+  namespace: studio-pipeline
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: studio-pipeline
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitlab-config-pvc
+  namespace: studio-pipeline
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitlab-logs-pvc
+  namespace: studio-pipeline
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitlab-data-pvc
+  namespace: studio-pipeline
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+# Services file (services.yaml)
+apiVersion: v1
+kind: Service
+metadata:
+  name: ayon-server
+  namespace: studio-pipeline
+spec:
+  ports:
+  - name: http
+    port: 5000
+    targetPort: 5000
+  selector:
+    app: ayon-server
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zulip-server
+  namespace: studio-pipeline
+spec:
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  - name: https
+    port: 443
+    targetPort: 443
+  selector:
+    app: zulip-server
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: studio-pipeline
+spec:
+  ports:
+  - name: mongodb
+    port: 27017
+    targetPort: 27017
+  selector:
+    app: mongodb
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab
+  namespace: studio-pipeline
+spec:
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  - name: https
+    port: 443
+    targetPort: 443
+  selector:
+    app: gitlab
+  type: ClusterIP
+
