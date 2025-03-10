@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-space
+  namespace: dd-space
+  labels:
+    app: web-space
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-space
+  template:
+    metadata:
+      labels:
+        app: web-space
+    spec:
+      containers:
+      - name: web-space
+        image: balajidd/iospace:1.2.0
+        ports:
+        - containerPort: 8000
+        env:
+        - name: AYON_SERVER_URL
+          value: "http://localhost:30008/"
+        - name: AYON_API_KEY
+          value: "" # Add your API key here
+        - name: ALLOWED_HOSTS
+          value: "192.168.59.100" # Add allowed hosts here
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-space-service
+  namespace: dd-space
+spec:
+  selector:
+    app: web-space
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+    nodePort: 32000 # NodePort to expose the service
+  type: NodePort
