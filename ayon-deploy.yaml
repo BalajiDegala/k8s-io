@@ -22,7 +22,7 @@ spec:
     - ReadWriteOnce
   storageClassName: local-storage
   hostPath:
-    path: /mnt/data/postgres
+    path: /mnt/data/ayon/postgres
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -48,7 +48,7 @@ spec:
     - ReadWriteMany
   storageClassName: local-storage
   hostPath:
-    path: /mnt/data/storage
+    path: /mnt/data/ayon/storage
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

@@ -1,6 +1,0 @@
-balajid@kubernetes-master:~/Downloads/kube$ sudo k8s kubectl get service ayon-server -n studio-pipeline
-NAME          TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
-ayon-server   ClusterIP   10.152.183.245   <none>        5000/TCP   4m58s
-balajid@kubernetes-master:~/Downloads/kube$ sudo k8s kubectl port-forward service/ayon-server 5000:5000 -n studio-pipeline
-Forwarding from 127.0.0.1:5000 -> 5000
-Forwarding from [::1]:5000 -> 5000

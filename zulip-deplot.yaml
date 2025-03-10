@@ -124,7 +124,7 @@ spec:
     - ReadWriteOnce
   storageClassName: zulip-storage-class
   hostPath:
-    path: /mnt/data/postgresql
+    path: /mnt/data/zulip/postgresql
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -137,7 +137,7 @@ spec:
     - ReadWriteOnce
   storageClassName: zulip-storage-class
   hostPath:
-    path: /mnt/data/memcached
+    path: /mnt/data/zulip/memcached
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -150,7 +150,7 @@ spec:
     - ReadWriteOnce
   storageClassName: zulip-storage-class
   hostPath:
-    path: /mnt/data/rabbitmq
+    path: /mnt/data/zulip/rabbitmq
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -163,7 +163,7 @@ spec:
     - ReadWriteOnce
   storageClassName: zulip-storage-class
   hostPath:
-    path: /mnt/data/redis
+    path: /mnt/data/zulip/redis
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -176,7 +176,7 @@ spec:
     - ReadWriteOnce
   storageClassName: zulip-storage-class
   hostPath:
-    path: /mnt/data/zulip
+    path: /mnt/data/zulip/zulip
 ---
 apiVersion: v1
 kind: Service
