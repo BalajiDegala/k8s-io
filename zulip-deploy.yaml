@@ -15,7 +15,7 @@ volumeBindingMode: WaitForFirstConsumer
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgresql-pvc
+  name: zulip-postgresql-pvc
   namespace: zulip
 spec:
   accessModes:
@@ -28,7 +28,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: memcached-pvc
+  name: zulip-memcached-pvc
   namespace: zulip
 spec:
   accessModes:
@@ -41,7 +41,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: rabbitmq-pvc
+  name: zulip-rabbitmq-pvc
   namespace: zulip
 spec:
   accessModes:
@@ -54,7 +54,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: redis-pvc
+  name: zulip-redis-pvc
   namespace: zulip
 spec:
   accessModes:
@@ -67,7 +67,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: zulip-pvc
+  name: zulip-zulip-pvc
   namespace: zulip
 spec:
   accessModes:
@@ -111,12 +111,12 @@ spec:
       volumes:
         - name: postgresql-storage
           persistentVolumeClaim:
-            claimName: postgresql-pvc
+            claimName: zulip-postgresql-pvc
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: postgresql-pv
+  name: zulip-postgresql-pv
 spec:
   capacity:
     storage: 10Gi
@@ -129,7 +129,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: memcached-pv
+  name: zulip-memcached-pv
 spec:
   capacity:
     storage: 1Gi
@@ -142,7 +142,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: rabbitmq-pv
+  name: zulip-rabbitmq-pv
 spec:
   capacity:
     storage: 2Gi
@@ -155,7 +155,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: redis-pv
+  name: zulip-redis-pv
 spec:
   capacity:
     storage: 2Gi
@@ -168,7 +168,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: zulip-pv
+  name: zulip-zulip-pv
 spec:
   capacity:
     storage: 20Gi
@@ -223,7 +223,7 @@ spec:
       volumes:
         - name: memcached-storage
           persistentVolumeClaim:
-            claimName: memcached-pvc
+            claimName: zulip-memcached-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -271,7 +271,7 @@ spec:
       volumes:
         - name: rabbitmq-storage
           persistentVolumeClaim:
-            claimName: rabbitmq-pvc
+            claimName: zulip-rabbitmq-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -318,7 +318,7 @@ spec:
       volumes:
         - name: redis-storage
           persistentVolumeClaim:
-            claimName: redis-pvc
+            claimName: zulip-redis-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -396,16 +396,21 @@ spec:
               value: "192.168.29.238:50080"
             - name: SETTING_ZULIP_ADMINISTRATOR
               value: "balajidegalas@gmail.com"
+            - name: SSL_CERTIFICATE_GENERATION
+              value: "self-signed"
+
           ports:
             - containerPort: 80
             - containerPort: 443
+
           volumeMounts:
             - mountPath: /data
-              name: zulip-storage
+              name: ssl-certificates
+              readOnly: true
       volumes:
-        - name: zulip-storage
-          persistentVolumeClaim:
-            claimName: zulip-pvc
+        - name: ssl-certificates
+          secret:
+            secretName: zulip-certificates
 ---
 apiVersion: v1
 kind: Service
