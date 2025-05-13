@@ -1,0 +1,225 @@
+🛠️ 1. What You'll Deploy
+App	Hostname	TLS Secret
+Ayon	ayon.local	ayon-tls-secret
+Zulip	zulip.local	zulip-tls-secret
+Grafana	grafana.local	grafana-tls-secret
+Prometheus	prometheus.local	prometheus-tls-secret
+PostgreSQL UI	pgui.local	pgui-tls-secret
+🔐 2. Generate Certificates Using mkcert
+
+On your Rocky Linux machine:
+
+mkcert ayon.local zulip.local grafana.local prometheus.local pgui.local
+
+This gives you:
+
+    ayon.local+5.pem (cert)
+
+    ayon.local+5-key.pem (key)
+
+Now split them up (optional but better for clarity):
+
+cp ayon.local+5.pem ayon.local.pem
+cp ayon.local+5-key.pem ayon.local-key.pem
+# Repeat for zulip, grafana, etc. (or regenerate individually if preferred)
+
+🔏 3. Create TLS Secrets in Kubernetes
+
+kubectl create secret tls ayon-tls-secret \
+  --cert=ayon.local.pem --key=ayon.local-key.pem -n ayon
+
+kubectl create secret tls zulip-tls-secret \
+  --cert=zulip.local.pem --key=zulip.local-key.pem -n zulip
+
+# Repeat for others (make sure you're in correct namespace)
+
+🌍 4. Update /etc/hosts
+
+On your local server and any client machine:
+
+192.168.1.240 ayon.local zulip.local grafana.local prometheus.local pgui.local
+
+Replace 192.168.1.240 with your server’s IP (used by MetalLB LoadBalancer).
+📥 5. Install NGINX Ingress & MetalLB (if not already)
+
+# MetalLB
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.7/config/manifests/metallb-native.yaml
+
+# MetalLB IP pool
+cat <<EOF | kubectl apply -f -
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: main-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.1.240-192.168.1.250
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: main-advert
+  namespace: metallb-system
+EOF
+
+# Ingress NGINX
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace \
+  --set controller.service.type=LoadBalancer \
+  --set controller.service.loadBalancerIP=192.168.1.240
+
+🌐 6. Final Ingress YAML (Single File, 5 Apps, 5 Certs)
+
+I'll write and share this for you — just tell me:
+
+    The namespace for each deployment (e.g. grafana, zulip, etc.)
+
+    The service name and port of each app
+
+For example:
+
+Ayon: service=ayon-frontend-service, port=80, namespace=ayon
+Zulip: service=zulip-web-service, port=80, namespace=zulip
+Grafana: service=grafana, port=3000, namespace=monitoring
+Prometheus: service=prometheus, port=9090, namespace=monitoring
+PostgreSQL UI: service=pgui-service, port=8080, namespace=pgadmin
+
+Once I have these, I’ll generate the full Ingress YAML for you 🔥
+
+Would you like me to:
+
+    ✅ Bundle this as a bash script?
+
+    ✅ Auto-detect these from your cluster with kubectl?
+
+    ✅ Write a Helm chart or Kustomize layout?
+
+Let me know how automated you want it — I got you 💪
+You said:
+yes give me yaml file 
+ChatGPT said:
+
+Awesome! Here's your complete Ingress YAML file that supports 5 deployments, each with:
+
+    A dedicated hostname
+
+    A separate TLS certificate
+
+    One shared NGINX Ingress controller
+
+✅ Assumptions (you can edit these if needed)
+App	Hostname	Namespace	Service Name	Port
+Ayon	ayon.local	ayon	ayon-frontend-service	80
+Zulip	zulip.local	zulip	zulip-web-service	80
+Grafana	grafana.local	monitoring	grafana	3000
+Prometheus	prometheus.local	monitoring	prometheus	9090
+PostgreSQL UI	pgui.local	pgadmin	pgui-service	8080
+📄 multi-app-ingress.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: multi-app-ingress
+  namespace: ingress-nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ayon.local
+      secretName: ayon-tls-secret
+    - hosts:
+        - zulip.local
+      secretName: zulip-tls-secret
+    - hosts:
+        - grafana.local
+      secretName: grafana-tls-secret
+    - hosts:
+        - prometheus.local
+      secretName: prometheus-tls-secret
+    - hosts:
+        - pgui.local
+      secretName: pgui-tls-secret
+  rules:
+    - host: ayon.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ayon-frontend-service
+                port:
+                  number: 80
+    - host: zulip.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: zulip-web-service
+                port:
+                  number: 80
+    - host: grafana.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+    - host: prometheus.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090
+    - host: pgui.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pgui-service
+                port:
+                  number: 8080
+
+✅ How to Use
+
+    Save the file as multi-app-ingress.yaml.
+
+    Apply it:
+
+kubectl apply -f multi-app-ingress.yaml
+
+    Open these in your browser:
+
+        https://ayon.local
+
+        https://zulip.local
+
+        https://grafana.local
+
+        https://prometheus.local
+
+        https://pgui.local
+
+(assuming all TLS certs and /etc/hosts are set up)
+
+If you want this to be auto-generated via script or Helm chart, let me know.
+Also, I can package everything for you (mkcert, cert creation, secret creation, ingress creation) into one automation script 💡
+
+Want that too?

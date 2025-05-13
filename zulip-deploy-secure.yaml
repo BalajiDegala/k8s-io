@@ -10,7 +10,20 @@ metadata:
   name: zulip-storage-class
 provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
-
+---
+# Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: zulip-secrets
+  namespace: zulip
+type: Opaque
+data:
+  postgres-password: cG9zdGdyZXM=
+  memcached-password: bWVtY2FjaGVk
+  rabbitmq-password: cmFiYml0bXE=
+  redis-password: cmVkaXM=
+  zulip-secret-key: enVsaXA=
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -353,12 +366,23 @@ spec:
         - name: zulip
           image: zulip/docker-zulip:9.4-0
           env:
+            # Add these two environment variables
+            - name: SSL_CERTIFICATE_GENERATION
+              value: "self-signed"
+            - name: DISABLE_HTTPS
+              value: "true"
+            # Existing environment variables
             - name: DB_HOST
               value: "postgresql"
             - name: DB_HOST_PORT
               value: "5432"
             - name: DB_USER
               value: "zulip"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: zulip-secrets
+                  key: postgres-password
             - name: SETTING_MEMCACHED_LOCATION
               value: "memcached:11211"
             - name: SETTING_RABBITMQ_HOST
@@ -393,7 +417,7 @@ spec:
                   name: zulip-secrets
                   key: zulip-secret-key
             - name: SETTING_EXTERNAL_HOST
-              value: "192.168.59.100:30080"
+              value: "zulip.local"
             - name: SETTING_ZULIP_ADMINISTRATOR
               value: "balajidegalas@gmail.com"
           ports:
@@ -420,22 +444,34 @@ spec:
       protocol: TCP
       port: 80
       targetPort: 80
-      nodePort: 30080
-    - name: https
-      protocol: TCP
-      port: 443
-      targetPort: 443
-      nodePort: 30443
-  type: NodePort
+  type: ClusterIP
 ---
-apiVersion: v1
-kind: Secret
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: zulip-secrets
+  name: zulip-ingress
   namespace: zulip
-data:
-  postgres-password: cG9zdGdyZXM=
-  memcached-password: bWVtY2FjaGVk
-  rabbitmq-password: cmFiYml0bXE=
-  redis-password: cmVkaXM=
-  zulip-secret-key: enVsaXA=
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  rules:
+  - host: zulip.local 
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: zulip
+            port:
+              number: 80
+
+
+# kubectl create secret tls zulip-tls-secret \
+#   --cert=certificate.crt \
+#   --key=private.key \
+#   -n zulip

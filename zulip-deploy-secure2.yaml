@@ -10,7 +10,6 @@ metadata:
   name: zulip-storage-class
 provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
-
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -112,7 +111,9 @@ spec:
         - name: postgresql-storage
           persistentVolumeClaim:
             claimName: postgresql-pvc
+
 ---
+# Persistent Volumes
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -178,6 +179,34 @@ spec:
   hostPath:
     path: /data/zulip
 ---
+# Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: zulip-secrets
+  namespace: zulip
+type: Opaque
+data:
+  postgres-password: cG9zdGdyZXM=
+  memcached-password: bWVtY2FjaGVk
+  rabbitmq-password: cmFiYml0bXE=
+  redis-password: cmVkaXM=
+  zulip-secret-key: enVsaXA=
+---
+# ConfigMap for Environment Variables
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zulip-config
+  namespace: zulip
+data:
+  ZULIP_DB_HOST: postgresql
+  ZULIP_REDIS_HOST: redis
+  ZULIP_MEMCACHED_HOST: memcached
+  ZULIP_RABBITMQ_HOST: rabbitmq
+  ZULIP_AUTH_BACKENDS: "EmailAuthBackend"
+---
+# PostgreSQL Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -192,6 +221,7 @@ spec:
       targetPort: 5432
   type: ClusterIP
 ---
+# Memcached Deployment and Service
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -210,13 +240,10 @@ spec:
       containers:
         - name: memcached
           image: memcached:alpine
-          args: ["-S"]
+          args: []  
           env:
             - name: MEMCACHED_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: zulip-secrets
-                  key: memcached-password
+              value: ""  
           volumeMounts:
             - mountPath: /home/memcache
               name: memcached-storage
@@ -239,6 +266,7 @@ spec:
       targetPort: 11211
   type: ClusterIP
 ---
+# RabbitMQ Deployment and Service
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -287,6 +315,7 @@ spec:
       targetPort: 5672
   type: ClusterIP
 ---
+# Redis Deployment and Service
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -334,6 +363,7 @@ spec:
       targetPort: 6379
   type: ClusterIP
 ---
+# Zulip Deployment and Service
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -351,61 +381,66 @@ spec:
     spec:
       containers:
         - name: zulip
-          image: zulip/docker-zulip:9.4-0
+          image: zulip/docker-zulip:latest
           env:
+            - name: SSL_CERTIFICATE_GENERATION
+              value: "self-signed"
             - name: DB_HOST
               value: "postgresql"
             - name: DB_HOST_PORT
               value: "5432"
             - name: DB_USER
               value: "zulip"
-            - name: SETTING_MEMCACHED_LOCATION
-              value: "memcached:11211"
             - name: SETTING_RABBITMQ_HOST
               value: "rabbitmq"
             - name: SETTING_REDIS_HOST
               value: "redis"
+            - name: SETTING_EXTERNAL_HOST
+              value: "zulip.local"
+            - name: SETTING_ZULIP_ADMINISTRATOR
+              value: "admin@example.com"
             - name: SECRETS_email_password
               value: "123456789"
             - name: SECRETS_rabbitmq_password
               valueFrom:
-                secretKeyRef:
-                  name: zulip-secrets
-                  key: rabbitmq-password
+                  secretKeyRef:
+                    name: zulip-secrets
+                    key: rabbitmq-password
             - name: SECRETS_postgres_password
               valueFrom:
-                secretKeyRef:
-                  name: zulip-secrets
-                  key: postgres-password
-            - name: SECRETS_memcached_password
-              valueFrom:
-                secretKeyRef:
-                  name: zulip-secrets
-                  key: memcached-password
+                  secretKeyRef:
+                    name: zulip-secrets
+                    key: postgres-password
             - name: SECRETS_redis_password
               valueFrom:
-                secretKeyRef:
-                  name: zulip-secrets
-                  key: redis-password
+                  secretKeyRef:
+                    name: zulip-secrets
+                    key: redis-password
             - name: SECRETS_secret_key
               valueFrom:
-                secretKeyRef:
-                  name: zulip-secrets
-                  key: zulip-secret-key
-            - name: SETTING_EXTERNAL_HOST
-              value: "192.168.59.100:30080"
-            - name: SETTING_ZULIP_ADMINISTRATOR
-              value: "balajidegalas@gmail.com"
+                  secretKeyRef:
+                    name: zulip-secrets
+                    key: zulip-secret-key
+            - name: SETTING_MEMCACHED_LOCATION
+              value: "memcached:11211"
+            - name: SETTING_CACHES
+              value: |
+                {
+                  "default": {
+                    "BACKEND": "django_bmemcached.memcached.BMemcached",
+                    "LOCATION": "memcached:11211"
+                  }
+                }
           ports:
             - containerPort: 80
-            - containerPort: 443
           volumeMounts:
-            - mountPath: /data
-              name: zulip-storage
+            - name: zulip-data
+              mountPath: /data
       volumes:
-        - name: zulip-storage
-          persistentVolumeClaim:
-            claimName: zulip-pvc
+        - name: zulip-data
+          hostPath:
+            path: /data
+            type: Directory
 ---
 apiVersion: v1
 kind: Service
@@ -420,22 +455,40 @@ spec:
       protocol: TCP
       port: 80
       targetPort: 80
-      nodePort: 30080
-    - name: https
-      protocol: TCP
-      port: 443
-      targetPort: 443
-      nodePort: 30443
-  type: NodePort
+  type: ClusterIP
 ---
-apiVersion: v1
-kind: Secret
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: zulip-secrets
+  name: zulip-ingress
   namespace: zulip
-data:
-  postgres-password: cG9zdGdyZXM=
-  memcached-password: bWVtY2FjaGVk
-  rabbitmq-password: cmFiYml0bXE=
-  redis-password: cmVkaXM=
-  zulip-secret-key: enVsaXA=
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - zulip.local
+      secretName: zulip-tls
+  rules:
+    - host: zulip.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: zulip
+                port:
+                  number: 80
+
+
+# openssl req -x509 -newkey rsa:4096 -keyout zulip.key -out zulip.crt -days 365 -nodes -subj "/CN=zulip.local"
+
+
+# kubectl create secret tls zulip-tls \
+#   --cert=zulip.crt \
+#   --key=zulip.key \
+#   -n zulip
