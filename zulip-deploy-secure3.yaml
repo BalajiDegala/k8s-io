@@ -366,10 +366,12 @@ spec:
         - name: zulip
           image: zulip/docker-zulip:9.4-0
           env:
+            # Add these two environment variables
             - name: SSL_CERTIFICATE_GENERATION
               value: "self-signed"
             - name: DISABLE_HTTPS
               value: "true"
+            # Existing environment variables
             - name: DB_HOST
               value: "postgresql"
             - name: DB_HOST_PORT
@@ -414,18 +416,10 @@ spec:
                 secretKeyRef:
                   name: zulip-secrets
                   key: zulip-secret-key
-            - name: SETTING_DEFAULT_LANGUAGE
-              value: "en"
-            - name: LANG
-              value: "en_US.UTF-8"
-            - name: LANGUAGE
-              value: "en_US.UTF-8"
             - name: SETTING_EXTERNAL_HOST
               value: "zulip.d2-india.com"
             - name: SETTING_ZULIP_ADMINISTRATOR
               value: "balajidegalas@gmail.com"
-            - name: SETTING_DEFAULT_LANGUAGE_NAME
-              value: "English"
           ports:
             - containerPort: 80
             - containerPort: 443
@@ -458,21 +452,12 @@ metadata:
   name: zulip-ingress
   namespace: zulip
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/rewrite-target: /
     kubernetes.io/ingress.class: "nginx"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header Accept-Language $http_accept_language;
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
-  ingressClassName: nginx
-  tls:
-    - hosts:
-        - zulip.d2-india.com
-      secretName: zulip-tls
   rules:
   - host: zulip.d2-india.com
     http:

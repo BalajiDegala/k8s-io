@@ -6,7 +6,7 @@ metadata:
   name: local-storage
   namespace: ayon
 provisioner: kubernetes.io/no-provisioner
-volumeBindingMode: WaitForFirstConsumer
+volumeBindingMode: Immediate
 
 ---
 
@@ -62,6 +62,30 @@ spec:
       storage: 5Gi
   storageClassName: local-storage
 
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: addons-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes: [ReadWriteMany]
+  storageClassName: local-storage
+  hostPath:
+    path: /data/ayon-addons
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: addons-pvc
+  namespace: ayon
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-storage
 ---
 
 # Postgres Secrets
@@ -179,7 +203,7 @@ metadata:
   name: redis
   namespace: ayon
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: redis
@@ -194,6 +218,7 @@ spec:
       containers:
         - name: redis
           image: redis:alpine
+          command: ["redis-server", "--stop-writes-on-bgsave-error", "no"]
           ports:
             - containerPort: 6379
           readinessProbe:
@@ -213,6 +238,12 @@ spec:
             limits:
               cpu: "250m"
               memory: "256Mi"
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          emptyDir: {}
 
 ---
 
@@ -253,7 +284,7 @@ spec:
         runAsGroup: 1000
       containers:
         - name: server
-          image: ynput/ayon:latest
+          image: localhost:5000/ayon-docker:1.1.0
           ports:
             - containerPort: 5000
           readinessProbe:
@@ -273,6 +304,12 @@ spec:
             value: "redis"
           - name: POSTGRES__HOST
             value: postgres
+          - name: AYON_SESSION_COOKIE_DOMAIN
+            value: "ayon.d2-india.com"
+          - name: AYON_PROXY_SCHEME
+            value: "https"
+          - name: AYON_PROXY_HOST
+            value: "ayon.d2-india.com"
           volumeMounts:
             - mountPath: /addons
               name: addons-volume
@@ -289,11 +326,13 @@ spec:
               memory: "2Gi"
       volumes:
         - name: addons-volume
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: addons-pvc
         - name: var-run
           emptyDir: {}
         - name: storage-volume
           persistentVolumeClaim:
+            claimName: storage-pvc
 
 ---
 
@@ -307,14 +346,20 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - ayon.local
+        - ayon.d2-india.com
       secretName: ayon-tls
   rules:
-    - host: ayon.local
+    - host: ayon.d2-india.com
       http:
         paths:
           - path: /
