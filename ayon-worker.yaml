@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ayon-worker
+  namespace: ayon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ayon-worker
+  template:
+    metadata:
+      labels:
+        app: ayon-worker
+    spec:
+      containers:
+        - name: ayon-worker
+          image: balajidd/ash:1.3.0  
+          imagePullPolicy: Always
+          env:
+            - name: AYON_API_KEY
+              value: "8a02395a1411c0802832e5930ec9d9510809543cbf09411afbf0ce80733080fb"
+            - name: AYON_SERVER_URL
+              value: "https://ayon.d2-india.com"
+            - name: REQUESTS_CA_BUNDLE
+              value: "/certs/tls.crt"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: tls-volume
+              mountPath: /certs
+              readOnly: true
+      volumes:
+        - name: tls-volume
+          secret:
+            secretName: ayon-tls
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shotgrid-leecher
+  namespace: ayon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shotgrid-leecher
+  template:
+    metadata:
+      labels:
+        app: shotgrid-leecher
+    spec:
+      containers:
+        - name: leecher
+          image: balajidd/leecher:1.0.0
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: shotgrid-env
+          volumeMounts:
+            - name: tls-volume
+              mountPath: /certs
+              readOnly: true
+      volumes:
+        - name: tls-volume
+          secret:
+            secretName: ayon-tls
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shotgrid-processor
+  namespace: ayon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shotgrid-processor
+  template:
+    metadata:
+      labels:
+        app: shotgrid-processor
+    spec:
+      containers:
+        - name: processor
+          image: balajidd/processor:1.0.0
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: shotgrid-env
+          volumeMounts:
+            - name: tls-volume
+              mountPath: /certs
+              readOnly: true
+      volumes:
+        - name: tls-volume
+          secret:
+            secretName: ayon-tls
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shotgrid-transmitter
+  namespace: ayon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shotgrid-transmitter
+  template:
+    metadata:
+      labels:
+        app: shotgrid-transmitter
+    spec:
+      containers:
+        - name: transmitter
+          image: balajidd/transmitter:1.0.0
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: shotgrid-env
+          volumeMounts:
+            - name: tls-volume
+              mountPath: /certs
+              readOnly: true
+      volumes:
+        - name: tls-volume
+          secret:
+            secretName: ayon-tls

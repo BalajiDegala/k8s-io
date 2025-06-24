@@ -185,14 +185,16 @@ metadata:
   name: keycloak-ingress
   namespace: ayon
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
         - keycloak.d2-india.com
-      secretName: keycloak-tls
+      secretName: ayon-tls
   rules:
     - host: keycloak.d2-india.com
       http:

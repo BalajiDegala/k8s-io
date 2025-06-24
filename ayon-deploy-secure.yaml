@@ -284,7 +284,7 @@ spec:
         runAsGroup: 1000
       containers:
         - name: server
-          image: localhost:5000/ayon-docker:1.1.0
+          image: balajidd/ayon:1.2.0
           ports:
             - containerPort: 5000
           readinessProbe:
@@ -300,6 +300,8 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 20
           env:
+          - name: REQUESTS_CA_BUNDLE
+            value: /etc/ssl/certs/ca-certificates.crt
           - name: REDIS__HOST
             value: "redis"
           - name: POSTGRES__HOST
@@ -344,8 +346,8 @@ metadata:
   namespace: ayon
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header X-Forwarded-Proto $scheme;

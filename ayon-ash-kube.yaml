@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ayon-worker
+  namespace: ayon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ayon-worker
+  template:
+    metadata:
+      labels:
+        app: ayon-worker
+    spec:
+      serviceAccountName: ayon-worker    
+      containers:
+        - name: ayon-worker
+          image: balajidd/ash:1.7.0
+          imagePullPolicy: Always
+          env:
+            - name: AYON_API_KEY
+              value: "dc0d77e2cb094156882d81c7c2185eb5"
+            - name: AYON_SERVER_URL
+              value: "http://ayon.d2-india.com"
+            - name: AYON_USE_K8S
+              value: "true"
+            - name: AYON_K8S_NAMESPACE
+              value: "ayon"
